@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { validateSchema } from '../../src/helpers/schemaValidator';
+import { authTokenResponseSchema } from '../../src/schemas/authSchemas';
 
-test('TC7 - POST /auth should create an auth token', async ({ request }) => {
+test('TC7 - POST /auth should create an auth token @smoke @regression @auth', async ({
+  request
+}) => {
   const authPayload = {
     username: 'admin',
     password: 'password123'
@@ -12,9 +16,7 @@ test('TC7 - POST /auth should create an auth token', async ({ request }) => {
 
   expect(response.status()).toBe(200);
 
-  const responseBody = await response.json();
+  const responseBody = validateSchema(authTokenResponseSchema, await response.json());
 
-  expect(responseBody).toHaveProperty('token');
-  expect(typeof responseBody.token).toBe('string');
   expect(responseBody.token.length).toBeGreaterThan(0);
 });

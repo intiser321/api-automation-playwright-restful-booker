@@ -1,97 +1,73 @@
 import { expect, test } from '@playwright/test';
+import { BookingClient } from '../../src/api/bookingClient';
 import { buildBookingPayload } from '../../src/data/bookingData';
+import { createAuthToken } from '../../src/helpers/authHelper';
+import { validateSchema } from '../../src/helpers/schemaValidator';
+import {
+  bookingDetailsSchema,
+  bookingIdListSchema,
+  createBookingResponseSchema
+} from '../../src/schemas/bookingSchemas';
 
-test('TC2 - GET /booking should return booking ids', async ({ request }) => {
-  const response = await request.get('/booking');
+test('TC2 - GET /booking should return booking ids @regression', async ({ request }) => {
+  const bookingClient = new BookingClient(request);
+  const response = await bookingClient.getBookingIds();
 
   expect(response.status()).toBe(200);
   const responseBody = await response.json();
-  expect(Array.isArray(responseBody)).toBeTruthy();
-  expect(responseBody.length).toBeGreaterThan(0);
-  expect(responseBody[0]).toHaveProperty('bookingid');
+  const bookingIds = validateSchema(bookingIdListSchema, responseBody);
+  expect(bookingIds.length).toBeGreaterThan(0);
 });
 
-test('TC3 - GET /booking/{id} should return booking details', async ({ request }) => {
-  const allBookingIdResponse = await request.get('/booking');
+test('TC3 - GET /booking/{id} should return booking details @regression', async ({ request }) => {
+  const bookingClient = new BookingClient(request);
+  const allBookingIdResponse = await bookingClient.getBookingIds();
   expect(allBookingIdResponse.status()).toBe(200);
-  const allBookingIdResponseBody = await allBookingIdResponse.json();
-  expect(Array.isArray(allBookingIdResponseBody)).toBeTruthy();
+  const allBookingIdResponseBody = validateSchema(
+    bookingIdListSchema,
+    await allBookingIdResponse.json()
+  );
   expect(allBookingIdResponseBody.length).toBeGreaterThan(0);
-  expect(allBookingIdResponseBody[0]).toHaveProperty('bookingid');
 
   const urlParameter = allBookingIdResponseBody[0].bookingid;
 
-  const bookingInfoResponse = await request.get(`/booking/${urlParameter}`);
+  const bookingInfoResponse = await bookingClient.getBookingById(urlParameter);
   expect(bookingInfoResponse.status()).toBe(200);
-  const bookingInfoResponseBody = await bookingInfoResponse.json();
-
-  expect(bookingInfoResponseBody).toHaveProperty('firstname');
-  expect(typeof bookingInfoResponseBody.firstname).toBe('string');
-
-  expect(bookingInfoResponseBody).toHaveProperty('lastname');
-  expect(typeof bookingInfoResponseBody.lastname).toBe('string');
-
-  expect(bookingInfoResponseBody).toHaveProperty('totalprice');
-  expect(typeof bookingInfoResponseBody.totalprice).toBe('number');
-
-  expect(bookingInfoResponseBody).toHaveProperty('depositpaid');
-  expect(typeof bookingInfoResponseBody.depositpaid).toBe('boolean');
-
-  expect(bookingInfoResponseBody).toHaveProperty('bookingdates');
-  expect(bookingInfoResponseBody.bookingdates).toHaveProperty('checkin');
-  expect(typeof bookingInfoResponseBody.bookingdates.checkin).toBe('string');
-  expect(bookingInfoResponseBody.bookingdates).toHaveProperty('checkout');
-  expect(typeof bookingInfoResponseBody.bookingdates.checkout).toBe('string');
-
-  if (bookingInfoResponseBody.additionalneeds !== undefined) {
-    expect(typeof bookingInfoResponseBody.additionalneeds).toBe('string');
-  }
+  validateSchema(bookingDetailsSchema, await bookingInfoResponse.json());
 });
 
-test('TC4 - GET /booking/{id} should return 404 for invalid booking id', async ({ request }) => {
-  const response = await request.get('/booking/999999999');
+test('TC4 - GET /booking/{id} should return 404 for invalid booking id @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
+  const response = await bookingClient.getBookingById(999999999);
 
   expect(response.status()).toBe(404);
 });
 
-test('TC5 - POST /booking should create a booking', async ({ request }) => {
+test('TC5 - POST /booking should create a booking @smoke @regression', async ({ request }) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload();
 
-  const response = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const response = await bookingClient.createBooking(bookingPayload);
 
   expect(response.status()).toBe(200);
 
-  const responseBody = await response.json();
+  const createdBooking = validateSchema(createBookingResponseSchema, await response.json());
 
-  expect(responseBody).toHaveProperty('bookingid');
-  expect(typeof responseBody.bookingid).toBe('number');
-  expect(responseBody).toHaveProperty('booking');
-  expect(responseBody.booking).toMatchObject(bookingPayload);
+  expect(createdBooking.booking).toMatchObject(bookingPayload);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const cleanupResponse = await request.delete(`/booking/${responseBody.bookingid}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(createdBooking.bookingid, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC6 - GET /booking should filter bookings by firstname and lastname', async ({ request }) => {
+test('TC6 - GET /booking should filter bookings by firstname and lastname @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const uniqueValue = Date.now();
   const bookingPayload = buildBookingPayload({
     firstname: `Intiser${uniqueValue}`,
@@ -105,68 +81,54 @@ test('TC6 - GET /booking should filter bookings by firstname and lastname', asyn
     additionalneeds: 'Lunch'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const createdBookingId = createBookingResponseBody.bookingid;
 
-  const filterBookingResponse = await request.get(
-    `/booking?firstname=${bookingPayload.firstname}&lastname=${bookingPayload.lastname}`
+  const filterBookingResponse = await bookingClient.filterBookingsByName(
+    bookingPayload.firstname,
+    bookingPayload.lastname
   );
 
   expect(filterBookingResponse.status()).toBe(200);
 
-  const filterBookingResponseBody = await filterBookingResponse.json();
+  const filterBookingResponseBody = validateSchema(
+    bookingIdListSchema,
+    await filterBookingResponse.json()
+  );
 
-  expect(Array.isArray(filterBookingResponseBody)).toBeTruthy();
   expect(filterBookingResponseBody.length).toBeGreaterThan(0);
   expect(filterBookingResponseBody).toContainEqual({ bookingid: createdBookingId });
 
-  const bookingDetailsResponse = await request.get(`/booking/${createdBookingId}`);
+  const bookingDetailsResponse = await bookingClient.getBookingById(createdBookingId);
 
   expect(bookingDetailsResponse.status()).toBe(200);
 
-  const bookingDetailsResponseBody = await bookingDetailsResponse.json();
+  const bookingDetailsResponseBody = validateSchema(
+    bookingDetailsSchema,
+    await bookingDetailsResponse.json()
+  );
 
   expect(bookingDetailsResponseBody).toMatchObject(bookingPayload);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const cleanupResponse = await request.delete(`/booking/${createdBookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(createdBookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC8 - DELETE /booking/{id} should delete a booking with valid token', async ({ request }) => {
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
-
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
+test('TC8 - DELETE /booking/{id} should delete a booking with valid token @smoke @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
+  const token = await createAuthToken(request);
 
   const bookingPayload = buildBookingPayload({
     firstname: 'Delete',
@@ -180,29 +142,29 @@ test('TC8 - DELETE /booking/{id} should delete a booking with valid token', asyn
     additionalneeds: 'None'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const bookingId = createBookingResponseBody.bookingid;
 
-  const deleteBookingResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const deleteBookingResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(deleteBookingResponse.status()).toBe(201);
 
-  const getDeletedBookingResponse = await request.get(`/booking/${bookingId}`);
+  const getDeletedBookingResponse = await bookingClient.getBookingById(bookingId);
 
   expect(getDeletedBookingResponse.status()).toBe(404);
 });
 
-test('TC9 - DELETE /booking/{id} should return 403 without auth token', async ({ request }) => {
+test('TC9 - DELETE /booking/{id} should return 403 without auth token @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Delete',
@@ -215,54 +177,43 @@ test('TC9 - DELETE /booking/{id} should return 403 without auth token', async ({
     additionalneeds: 'None'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const bookingId = createBookingResponseBody.bookingid;
 
-  const deleteWithoutTokenResponse = await request.delete(`/booking/${bookingId}`);
+  const deleteWithoutTokenResponse = await bookingClient.deleteBooking(bookingId);
 
   expect(deleteWithoutTokenResponse.status()).toBe(403);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const cleanupResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC10 - POST /booking should reject booking when firstname is missing', async ({
+test('TC10 - POST /booking should reject booking when firstname is missing @regression', async ({
   request
 }) => {
+  const bookingClient = new BookingClient(request);
   const { firstname: _removedFirstname, ...invalidBookingPayload } = buildBookingPayload();
 
-  const response = await request.post('/booking', {
-    data: invalidBookingPayload
-  });
+  const response = await bookingClient.createBooking(invalidBookingPayload);
 
   // Restful Booker rejects this payload with 500. In a production API, 400 would be clearer.
   expect(response.status()).toBe(500);
 });
 
-test('TC11 - PUT /booking should update the existing booking', async ({ request }) => {
+test('TC11 - PUT /booking should update the existing booking @smoke @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload({
     firstname: 'PUT',
     lastname: 'Test',
@@ -275,14 +226,12 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
     additionalneeds: 'None'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
   expect(createBookingResponse.status()).toBe(200);
-  const createBookingResponseBody = await createBookingResponse.json();
-  expect(createBookingResponseBody).toHaveProperty('bookingid');
-  expect(typeof createBookingResponseBody.bookingid).toBe('number');
-  expect(createBookingResponseBody).toHaveProperty('booking');
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   expect(createBookingResponseBody.booking).toMatchObject(bookingPayload);
   const bookingId = createBookingResponseBody.bookingid;
 
@@ -298,48 +247,40 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
     additionalneeds: 'Breakfast'
   });
 
-  const authPayload = {
-    username: 'admin',
-    password: 'password123'
-  };
+  const token = await createAuthToken(request);
 
-  const authResponse = await request.post('/auth', {
-    data: authPayload
-  });
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  expect(authResponseBody).toHaveProperty('token');
-  const token = authResponseBody.token;
-
-  const putBookingResponse = await request.put(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    },
-    data: updatedBookingPayload
-  });
+  const putBookingResponse = await bookingClient.updateBooking(
+    bookingId,
+    updatedBookingPayload,
+    token
+  );
 
   expect(putBookingResponse.status()).toBe(200);
 
-  const putBookingResponseBody = await putBookingResponse.json();
+  const putBookingResponseBody = validateSchema(
+    bookingDetailsSchema,
+    await putBookingResponse.json()
+  );
   expect(putBookingResponseBody).toMatchObject(updatedBookingPayload);
 
-  const getUpdatedBookingResponse = await request.get(`/booking/${bookingId}`);
+  const getUpdatedBookingResponse = await bookingClient.getBookingById(bookingId);
   expect(getUpdatedBookingResponse.status()).toBe(200);
 
-  const getUpdatedBookingResponseBody = await getUpdatedBookingResponse.json();
+  const getUpdatedBookingResponseBody = validateSchema(
+    bookingDetailsSchema,
+    await getUpdatedBookingResponse.json()
+  );
   expect(getUpdatedBookingResponseBody).toMatchObject(updatedBookingPayload);
 
-  const cleanupResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ request }) => {
+test('TC12 - PUT /booking/{id} should return 403 without auth token @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Update',
@@ -352,13 +293,14 @@ test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ r
     additionalneeds: 'None'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const bookingId = createBookingResponseBody.bookingid;
 
   const updatedBookingPayload = buildBookingPayload({
@@ -373,47 +315,25 @@ test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ r
     additionalneeds: 'Breakfast'
   });
 
-  const putWithoutTokenResponse = await request.put(`/booking/${bookingId}`, {
-    data: updatedBookingPayload
-  });
+  const putWithoutTokenResponse = await bookingClient.updateBooking(
+    bookingId,
+    updatedBookingPayload
+  );
 
   expect(putWithoutTokenResponse.status()).toBe(403);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const cleanupResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC13 - PATCH /booking/{id} should partially update a booking with valid token', async ({
+test('TC13 - PATCH /booking/{id} should partially update a booking with valid token @regression', async ({
   request
 }) => {
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
-
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
+  const bookingClient = new BookingClient(request);
+  const token = await createAuthToken(request);
 
   const bookingPayload = buildBookingPayload({
     firstname: 'Patch',
@@ -427,13 +347,14 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
     additionalneeds: 'Dinner'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const bookingId = createBookingResponseBody.bookingid;
 
   const partialUpdatePayload = {
@@ -441,16 +362,18 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
     lastname: 'Updated'
   };
 
-  const patchBookingResponse = await request.patch(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    },
-    data: partialUpdatePayload
-  });
+  const patchBookingResponse = await bookingClient.partialUpdateBooking(
+    bookingId,
+    partialUpdatePayload,
+    token
+  );
 
   expect(patchBookingResponse.status()).toBe(200);
 
-  const patchBookingResponseBody = await patchBookingResponse.json();
+  const patchBookingResponseBody = validateSchema(
+    bookingDetailsSchema,
+    await patchBookingResponse.json()
+  );
 
   expect(patchBookingResponseBody.firstname).toBe(partialUpdatePayload.firstname);
   expect(patchBookingResponseBody.lastname).toBe(partialUpdatePayload.lastname);
@@ -459,27 +382,29 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
   expect(patchBookingResponseBody.bookingdates).toMatchObject(bookingPayload.bookingdates);
   expect(patchBookingResponseBody.additionalneeds).toBe(bookingPayload.additionalneeds);
 
-  const getPatchedBookingResponse = await request.get(`/booking/${bookingId}`);
+  const getPatchedBookingResponse = await bookingClient.getBookingById(bookingId);
 
   expect(getPatchedBookingResponse.status()).toBe(200);
 
-  const getPatchedBookingResponseBody = await getPatchedBookingResponse.json();
+  const getPatchedBookingResponseBody = validateSchema(
+    bookingDetailsSchema,
+    await getPatchedBookingResponse.json()
+  );
 
   expect(getPatchedBookingResponseBody).toMatchObject({
     ...bookingPayload,
     ...partialUpdatePayload
   });
 
-  const cleanupResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
 
-test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({ request }) => {
+test('TC14 - PATCH /booking/{id} should return 403 without auth token @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Patch',
@@ -492,13 +417,14 @@ test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({
     additionalneeds: 'Dinner'
   });
 
-  const createBookingResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const createBookingResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(createBookingResponse.status()).toBe(200);
 
-  const createBookingResponseBody = await createBookingResponse.json();
+  const createBookingResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await createBookingResponse.json()
+  );
   const bookingId = createBookingResponseBody.bookingid;
 
   const partialUpdatePayload = {
@@ -506,33 +432,23 @@ test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({
     lastname: 'PatchUpdated'
   };
 
-  const patchWithoutTokenResponse = await request.patch(`/booking/${bookingId}`, {
-    data: partialUpdatePayload
-  });
+  const patchWithoutTokenResponse = await bookingClient.partialUpdateBooking(
+    bookingId,
+    partialUpdatePayload
+  );
 
   expect(patchWithoutTokenResponse.status()).toBe(403);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const cleanupResponse = await request.delete(`/booking/${bookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const cleanupResponse = await bookingClient.deleteBooking(bookingId, token);
 
   expect(cleanupResponse.status()).toBe(201);
 });
-test('TC15 - POST /booking should allow duplicate booking payloads', async ({ request }) => {
+test('TC15 - POST /booking should allow duplicate booking payloads @regression', async ({
+  request
+}) => {
+  const bookingClient = new BookingClient(request);
   const bookingPayload = buildBookingPayload({
     firstname: 'Duplicate',
     lastname: 'Payload',
@@ -545,54 +461,38 @@ test('TC15 - POST /booking should allow duplicate booking payloads', async ({ re
     additionalneeds: 'Breakfast'
   });
 
-  const firstCreateResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const firstCreateResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(firstCreateResponse.status()).toBe(200);
 
-  const firstCreateResponseBody = await firstCreateResponse.json();
+  const firstCreateResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await firstCreateResponse.json()
+  );
   const firstBookingId = firstCreateResponseBody.bookingid;
 
   expect(firstCreateResponseBody.booking).toMatchObject(bookingPayload);
 
-  const secondCreateResponse = await request.post('/booking', {
-    data: bookingPayload
-  });
+  const secondCreateResponse = await bookingClient.createBooking(bookingPayload);
 
   expect(secondCreateResponse.status()).toBe(200);
 
-  const secondCreateResponseBody = await secondCreateResponse.json();
+  const secondCreateResponseBody = validateSchema(
+    createBookingResponseSchema,
+    await secondCreateResponse.json()
+  );
   const secondBookingId = secondCreateResponseBody.bookingid;
 
   expect(secondCreateResponseBody.booking).toMatchObject(bookingPayload);
   expect(secondBookingId).not.toBe(firstBookingId);
 
-  const authResponse = await request.post('/auth', {
-    data: {
-      username: 'admin',
-      password: 'password123'
-    }
-  });
+  const token = await createAuthToken(request);
 
-  expect(authResponse.status()).toBe(200);
-
-  const authResponseBody = await authResponse.json();
-  const token = authResponseBody.token;
-
-  const firstCleanupResponse = await request.delete(`/booking/${firstBookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const firstCleanupResponse = await bookingClient.deleteBooking(firstBookingId, token);
 
   expect(firstCleanupResponse.status()).toBe(201);
 
-  const secondCleanupResponse = await request.delete(`/booking/${secondBookingId}`, {
-    headers: {
-      Cookie: `token=${token}`
-    }
-  });
+  const secondCleanupResponse = await bookingClient.deleteBooking(secondBookingId, token);
 
   expect(secondCleanupResponse.status()).toBe(201);
 });
