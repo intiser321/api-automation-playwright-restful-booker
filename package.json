@@ -1,0 +1,24 @@
+{
+  "name": "api-automation-playwright-restful-booker",
+  "version": "1.0.0",
+  "description": "API automation framework using Playwright, TypeScript, JSON schema validation, and GitHub Actions to test Restful Booker booking APIs.",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intiser321/api-automation-playwright-restful-booker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/intiser321/api-automation-playwright-restful-booker/issues"
+  },
+  "homepage": "https://github.com/intiser321/api-automation-playwright-restful-booker#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "prettier": "^3.8.5"
+  }
+}
