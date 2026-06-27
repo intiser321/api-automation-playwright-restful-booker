@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { buildBookingPayload } from '../../src/data/bookingData';
 
 test('TC2 - GET /booking should return booking ids', async ({ request }) => {
   const response = await request.get('/booking');
@@ -54,17 +55,7 @@ test('TC4 - GET /booking/{id} should return 404 for invalid booking id', async (
 });
 
 test('TC5 - POST /booking should create a booking', async ({ request }) => {
-  const bookingPayload = {
-    firstname: 'Intiser',
-    lastname: 'Chowdhury',
-    totalprice: 250,
-    depositpaid: true,
-    bookingdates: {
-      checkin: '2026-07-01',
-      checkout: '2026-07-05'
-    },
-    additionalneeds: 'Breakfast'
-  };
+  const bookingPayload = buildBookingPayload();
 
   const response = await request.post('/booking', {
     data: bookingPayload
@@ -102,7 +93,7 @@ test('TC5 - POST /booking should create a booking', async ({ request }) => {
 
 test('TC6 - GET /booking should filter bookings by firstname and lastname', async ({ request }) => {
   const uniqueValue = Date.now();
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: `Intiser${uniqueValue}`,
     lastname: `Chowdhury${uniqueValue}`,
     totalprice: 300,
@@ -112,7 +103,7 @@ test('TC6 - GET /booking should filter bookings by firstname and lastname', asyn
       checkout: '2026-08-05'
     },
     additionalneeds: 'Lunch'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -177,7 +168,7 @@ test('TC8 - DELETE /booking/{id} should delete a booking with valid token', asyn
   const authResponseBody = await authResponse.json();
   const token = authResponseBody.token;
 
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Delete',
     lastname: 'Me',
     totalprice: 150,
@@ -187,7 +178,7 @@ test('TC8 - DELETE /booking/{id} should delete a booking with valid token', asyn
       checkout: '2026-09-03'
     },
     additionalneeds: 'None'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -212,7 +203,7 @@ test('TC8 - DELETE /booking/{id} should delete a booking with valid token', asyn
 });
 
 test('TC9 - DELETE /booking/{id} should return 403 without auth token', async ({ request }) => {
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Delete',
     totalprice: 180,
@@ -222,7 +213,7 @@ test('TC9 - DELETE /booking/{id} should return 403 without auth token', async ({
       checkout: '2026-09-12'
     },
     additionalneeds: 'None'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -261,16 +252,7 @@ test('TC9 - DELETE /booking/{id} should return 403 without auth token', async ({
 test('TC10 - POST /booking should reject booking when firstname is missing', async ({
   request
 }) => {
-  const invalidBookingPayload = {
-    lastname: 'Chowdhury',
-    totalprice: 250,
-    depositpaid: true,
-    bookingdates: {
-      checkin: '2026-07-01',
-      checkout: '2026-07-05'
-    },
-    additionalneeds: 'Breakfast'
-  };
+  const { firstname: _removedFirstname, ...invalidBookingPayload } = buildBookingPayload();
 
   const response = await request.post('/booking', {
     data: invalidBookingPayload
@@ -281,7 +263,7 @@ test('TC10 - POST /booking should reject booking when firstname is missing', asy
 });
 
 test('TC11 - PUT /booking should update the existing booking', async ({ request }) => {
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'PUT',
     lastname: 'Test',
     totalprice: 180,
@@ -291,7 +273,7 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
       checkout: '2026-09-12'
     },
     additionalneeds: 'None'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -304,7 +286,7 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
   expect(createBookingResponseBody.booking).toMatchObject(bookingPayload);
   const bookingId = createBookingResponseBody.bookingid;
 
-  const updatedBookingPayload = {
+  const updatedBookingPayload = buildBookingPayload({
     firstname: 'PUTUPDATED',
     lastname: 'TestUPDATED',
     totalprice: 100,
@@ -314,7 +296,7 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
       checkout: '2026-09-12'
     },
     additionalneeds: 'Breakfast'
-  };
+  });
 
   const authPayload = {
     username: 'admin',
@@ -358,7 +340,7 @@ test('TC11 - PUT /booking should update the existing booking', async ({ request 
 });
 
 test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ request }) => {
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Update',
     totalprice: 180,
@@ -368,7 +350,7 @@ test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ r
       checkout: '2026-09-12'
     },
     additionalneeds: 'None'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -379,7 +361,7 @@ test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ r
   const createBookingResponseBody = await createBookingResponse.json();
   const bookingId = createBookingResponseBody.bookingid;
 
-  const updatedBookingPayload = {
+  const updatedBookingPayload = buildBookingPayload({
     firstname: 'UnauthorizedUpdated',
     lastname: 'UpdateUpdated',
     totalprice: 200,
@@ -389,7 +371,7 @@ test('TC12 - PUT /booking/{id} should return 403 without auth token', async ({ r
       checkout: '2026-10-12'
     },
     additionalneeds: 'Breakfast'
-  };
+  });
 
   const putWithoutTokenResponse = await request.put(`/booking/${bookingId}`, {
     data: updatedBookingPayload
@@ -433,7 +415,7 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
   const authResponseBody = await authResponse.json();
   const token = authResponseBody.token;
 
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Patch',
     lastname: 'Test',
     totalprice: 220,
@@ -443,7 +425,7 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
       checkout: '2026-11-12'
     },
     additionalneeds: 'Dinner'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -498,7 +480,7 @@ test('TC13 - PATCH /booking/{id} should partially update a booking with valid to
 });
 
 test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({ request }) => {
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Unauthorized',
     lastname: 'Patch',
     totalprice: 220,
@@ -508,7 +490,7 @@ test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({
       checkout: '2026-11-12'
     },
     additionalneeds: 'Dinner'
-  };
+  });
 
   const createBookingResponse = await request.post('/booking', {
     data: bookingPayload
@@ -551,7 +533,7 @@ test('TC14 - PATCH /booking/{id} should return 403 without auth token', async ({
   expect(cleanupResponse.status()).toBe(201);
 });
 test('TC15 - POST /booking should allow duplicate booking payloads', async ({ request }) => {
-  const bookingPayload = {
+  const bookingPayload = buildBookingPayload({
     firstname: 'Duplicate',
     lastname: 'Payload',
     totalprice: 275,
@@ -561,7 +543,7 @@ test('TC15 - POST /booking should allow duplicate booking payloads', async ({ re
       checkout: '2026-12-05'
     },
     additionalneeds: 'Breakfast'
-  };
+  });
 
   const firstCreateResponse = await request.post('/booking', {
     data: bookingPayload
