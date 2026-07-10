@@ -17,16 +17,8 @@
     "type": "git",
     "url": "git+https://github.com/intiser321/api-automation-playwright-restful-booker.git"
   },
-  "keywords": [
-    "playwright",
-    "api-testing",
-    "typescript",
-    "json-schema-validation",
-    "ajv",
-    "github-actions",
-    "qa-automation"
-  ],
-  "author": "Intiser",
+  "keywords": [],
+  "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/intiser321/api-automation-playwright-restful-booker/issues"

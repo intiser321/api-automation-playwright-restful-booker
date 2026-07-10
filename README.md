@@ -1,16 +1,6 @@
 # api-automation-playwright-restful-booker
 
-[![API Tests](https://github.com/intiser321/api-automation-playwright-restful-booker/actions/workflows/api-tests.yml/badge.svg?branch=main)](https://github.com/intiser321/api-automation-playwright-restful-booker/actions/workflows/api-tests.yml)
-
 API automation framework using Playwright, TypeScript, JSON schema validation, and GitHub Actions to test Restful Booker booking APIs.
-
-## Business value
-
-This project demonstrates how API automation can protect core service behavior and reduce regression risk.
-
-The framework validates important booking API workflows such as authentication, booking creation, retrieval, updates, deletion, negative cases, and schema validation. These checks help detect broken API behavior earlier and give teams more confidence before release.
-
-Schema validation is especially useful because it can catch contract changes even when a response still returns a successful status code.
 
 ## Tech Stack
 
@@ -57,18 +47,6 @@ Main endpoints covered:
 - Partial update with `PATCH`
 - Unauthorized `PATCH`
 
-## Test Strategy
-
-The test suite is organized around API risk areas:
-
-- Health check to confirm service availability
-- Authentication to validate token generation
-- Booking lifecycle checks for create, read, update, partial update, and delete
-- Negative scenarios for invalid IDs, missing required data, and unauthorized requests
-- JSON schema validation to detect response contract issues
-
-The goal is not only to check status codes. The suite also validates response structure and important business fields.
-
 ## Folder Structure
 
 ```text
@@ -94,31 +72,6 @@ tests/
   workflows/
     api-tests.yml           GitHub Actions workflow
 ```
-
-## Framework Architecture
-
-```mermaid
-flowchart LR
-    T["API test specs"] --> C["Booking API client"]
-    T --> D["Test data builder"]
-    T --> H["Auth helper"]
-    T --> S["Schema validator"]
-    C --> API["Restful Booker API"]
-    H --> API
-    S --> R["Response schema checks"]
-```
-
-## What this demonstrates for clients
-
-- Playwright API testing with TypeScript
-- Reusable API client methods
-- Auth helper for token-based flows
-- Test data builder for cleaner payloads
-- JSON schema validation with AJV
-- Positive and negative API coverage
-- Smoke and regression command separation
-- GitHub Actions CI workflow
-- README documentation for setup and handover
 
 ## Setup
 
